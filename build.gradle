@@ -1,10 +1,10 @@
 apply plugin: "idea"
 apply plugin: "java"
-apply plugin: "maven"
+apply plugin: "maven-publish"
 
-task wrapper(type: Wrapper) {
-	gradleVersion = '2.0'
-	distributionUrl = "http://services.gradle.org/distributions/gradle-${gradleVersion}-all.zip"
+wrapper {
+	gradleVersion = '8.1.1'
+	distributionUrl = "https://services.gradle.org/distributions/gradle-${gradleVersion}-all.zip"
 }
 
 sourceSets {
@@ -41,29 +41,30 @@ repositories {
 	mavenCentral()
 	maven {
 		url "http://maven.stardog.com"
+		allowInsecureProtocol = true
 	}
 }
 
 dependencies {
-	compile (group: "com.google.guava", name: "guava", version: "18.0") {
+	implementation (group: "com.google.guava", name: "guava", version: '30.0-jre') {
 		exclude group: "com.google.code.findbugs"
 	}
 
-	compile "commons-beanutils:commons-beanutils:1.9.2"
-	compile "commons-codec:commons-codec:1.10"
+	implementation 'commons-beanutils:commons-beanutils:1.9.4'
+	implementation 'commons-codec:commons-codec:1.13'
 
-	compile "com.complexible.common:cp-openrdf-utils:4.0.2"
-	compile ("com.complexible.common:cp-common-utils:5.0.1") {
+	implementation "com.complexible.common:cp-openrdf-utils:4.0.2"
+	implementation ("com.complexible.common:cp-common-utils:5.0.1") {
 		exclude group: "org.slf4j"
 	}
 
 	// these should be coming from cp-openrdf-utils, but it's missing these
-	compile "org.openrdf.sesame:sesame-rio-ntriples:4.0.0"
+	implementation "org.openrdf.sesame:sesame-rio-ntriples:4.0.0"
 
-	compile "org.slf4j:slf4j-api:1.7.7"
-	compile "org.slf4j:slf4j-jdk14:1.7.7"
+	implementation "org.slf4j:slf4j-api:1.7.7"
+	implementation "org.slf4j:slf4j-jdk14:1.7.7"
 
-	testCompile 'junit:junit:4.11'
+	testImplementation 'junit:junit:4.13.1'
 }
 
 tasks.withType(Test) {
