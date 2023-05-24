@@ -30,35 +30,31 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.hash.Hashing;
+import javafx.beans.property.Property;
+import jdk.nashorn.internal.runtime.regexp.joni.Warnings;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
-import org.openrdf.model.Literal;
-import org.openrdf.model.Model;
-import org.openrdf.model.Resource;
-import org.openrdf.model.Statement;
+import org.mockito.Mockito;
+import org.openrdf.model.*;
 import org.openrdf.model.impl.SimpleValueFactory;
 import org.openrdf.model.util.Models;
 import org.openrdf.model.vocabulary.XMLSchema;
+import org.slf4j.Logger;
 
+import java.beans.Beans;
+import java.beans.IntrospectionException;
+import java.beans.PropertyDescriptor;
 import java.io.File;
+import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.Collection;
-import java.util.Date;
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
-import java.util.SortedSet;
-import java.util.TimeZone;
-import java.util.UUID;
+import java.util.*;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * <p></p>
@@ -80,6 +76,22 @@ public class RDFMapperTests {
 		TimeZone.setDefault(tz);
 	}
 
+//	@Test(expected = RDFMappingException.class)
+//	public void testNewInstanceWithoutDefaultConstructor() {
+//		// Test the case where theClass does not have a default constructor
+//		// This test should throw RDFMappingException
+//		newInstance(ClassWithoutDefaultConstructor.class);
+//	}
+
+//	private static class ClassWithoutDefaultConstructor {
+//		public ClassWithoutDefaultConstructor(int value) {
+//			// Add any required constructor parameters
+//		}
+//	}
+
+
+
+
 	@Test(expected = UnidentifiableObjectException.class)
 	public void testUnidentifiable() throws Exception {
 		RDFMapper aMapper = RDFMapper.builder()
@@ -88,6 +100,7 @@ public class RDFMapperTests {
 
 		aMapper.writeValue(new ClassWithPrimitives());
 	}
+
 
 	@Test
 	public void testWritePrimitives() throws Exception {
@@ -203,6 +216,22 @@ public class RDFMapperTests {
 		assertTrue(Models.isomorphic(ModelIO.read(Files3.classPath("/data/primitive_rdf_lists.nt").toPath()),
 		                            aResult));
 	}
+
+//	@Test
+//	public void testWriteListsOfPrimitivesAsRdfListsWithOption2() throws Exception {
+//		ClassWithPrimitiveLists aObj = new ClassWithPrimitiveLists();
+//
+//		aObj.setInts(Lists.newArrayList(4, 5));
+//		aObj.id(SimpleValueFactory.getInstance().createIRI("tag:complexible:pinto:9017b0ab9335e4d090290a0dffc81826"));
+//
+//		final Model aResult = RDFMapper.builder()
+//				.set(MappingOptions.SERIALIZE_COLLECTIONS_AS_LISTS, false)
+//				.build()
+//				.writeValue(null);
+//
+////		assertTrue(Models.isomorphic(ModelIO.read(Files3.classPath("/data/primitive_rdf_lists.nt").toPath()),
+////				aResult));
+//	}
 
 	@Test
 	public void testWriteListsOfPrimitivesAsRdfListWithAnnotation() throws Exception {
@@ -521,7 +550,6 @@ public class RDFMapperTests {
 
 		assertTrue(aCompany.getName().equals("Complexible") || aCompany.getName().equals("Clark & Parsia"));
 	}
-
 	@Test
 	public void testAnnotationsWithInvalidURI() throws Exception {
 		BadCompany aCompany = new BadCompany();
@@ -699,6 +727,49 @@ public class RDFMapperTests {
 		RDFMapper.create().readValue(ModelIO.read(Files3.classPath("/data/mixed.nt").toPath()), CannotConstructMe.class);
 	}
 
+	@Test
+	public void testNoDefaultConstructor2() throws IOException {
+		try {
+			RDFMapper.create().readValue(ModelIO.read(Files3.classPath("/data/empty.nt").toPath()), CannotConstructMe.class);
+			fail("Expected RDFMappingException to be thrown");
+		} catch (RDFMappingException e) {
+			assertEquals("Could not create an instance of class com.complexible.pinto.RDFMapperTests$CannotConstructMe, it does not have a default constructor", e.getMessage());
+		}
+	}
+
+	@Test
+	public void testReadValueWhereClassIsNull() throws IOException {
+		RDFMapper.create().readValue(ModelIO.read(Files3.classPath("/data/object_lists.nt").toPath()), null, SimpleValueFactory.getInstance().createIRI("tag:complexible:pinto:639179e5744bfb428235966d51604d6a"));
+	}
+
+//	@Test
+//	public void testAbdel() throws IOException {
+//		RDFMapper.create().readValue(ModelIO.read(Files3.classPath("/data/object_lists.nt").toPath()), SampleBean.class, SimpleValueFactory.getInstance().createIRI("tag:complexible:pinto:639179e5744bfb428235966d51604d6a"));
+//	}
+//
+//	@Test(expected = RDFMappingException.class)
+//	public void testAbdel3() throws Exception {
+//		RDFMapper.create().readValue(ModelIO.read(Files3.classPath("/data/map.nt").toPath()), YourTestClass.class, SimpleValueFactory.getInstance().createIRI("tag:complexible:pinto:639179e5744bfb428235966d51604d6a"));
+//	}
+
+	private static class SampleBean {
+		private String propertyName;
+
+		public String getPropertyName() {
+			return propertyName;
+		}
+
+		public void setPropertyName(String propertyName) {
+			this.propertyName = propertyName;
+		}
+		public SampleBean() {
+		}
+	}
+
+
+
+
+
 	@Test(expected = RDFMappingException.class)
 	public void testCannotConstructAbstract() throws Exception {
 		RDFMapper.create().readValue(ModelIO.read(Files3.classPath("/data/mixed.nt").toPath()), CannotConstructMe2.class);
@@ -736,6 +807,16 @@ public class RDFMapperTests {
 				                              .readValue(aGraph, UUID.class);
 
 		assertEquals(UUID.fromString("0110f311-964b-440d-b772-92c621c5d1e4"), aResult);
+	}
+
+	@Test
+	public void testReadWithNullCodec() throws Exception {
+		final Model aGraph = ModelIO.read(Files3.classPath("/data/empty.nt").toPath());
+
+		final UUID aResult = RDFMapper.builder()
+				.codec(UUID.class, UUIDCodec.Instance)
+				.build()
+				.readValue(aGraph, UUID.class);
 	}
 
 	@Test
@@ -778,6 +859,162 @@ public class RDFMapperTests {
 		                                 .readValue(aGraph, ClassWithMap.class,
 		                                                    SimpleValueFactory.getInstance().createIRI("tag:complexible:pinto:06f95e70fea33fcd99e6804b02f96cc9")));
 	}
+
+	@Test (expected = IllegalStateException.class)
+	public void testReadMapsWithException() throws Exception {
+		final ClassWithMap aExpected = new ClassWithMap();
+
+		aExpected.mMap = Maps.newLinkedHashMap();
+
+		aExpected.mMap.put("bob", new Person("Bob the tester"));
+		aExpected.mMap.put(1L, "the size of something");
+		aExpected.mMap.put(new Date(1426361082470L), 57.4);
+		aExpected.mMap.put(new Person("another person"), new Company("The company"));
+
+		final Model aGraph = ModelIO.read(Files3.classPath("/data/map.nt").toPath());
+
+		RDFMapper.builder()
+				.set(MappingOptions.IGNORE_CARDINALITY_VIOLATIONS, true)
+				.map(FOAF.ontology().Person, Person.class)
+				.map(SimpleValueFactory.getInstance().createIRI("urn:Company"), Company.class)
+				.map(FOAF.ontology().Person, Person.class)
+				.build()
+				.readValue(aGraph, ClassWithMap.class,
+						SimpleValueFactory.getInstance().createIRI("tag:complexible:pinto:06f95e70fea33fcd99e6804b02f96cc9"));
+	}
+
+	@Test (expected = RDFMappingException.class)
+	public void testReadMapsWithException2() throws Exception {
+		final Model aGraph = ModelIO.read(Files3.classPath("/data/doublemap.nt").toPath());
+
+		RDFMapper.builder()
+				.set(MappingOptions.IGNORE_CARDINALITY_VIOLATIONS, false)
+				.map(FOAF.ontology().Person, Person.class)
+				.build()
+				.readValue(aGraph, ClassWithMap.class,
+						SimpleValueFactory.getInstance().createIRI("tag:complexible:pinto:06f95e70fea33fcd99e6804b02f96cc9"));
+	}
+
+	@Test
+	public void testReadMapsWithException3() throws Exception {
+
+		final Model aGraph = ModelIO.read(Files3.classPath("/data/doublemap.nt").toPath());
+
+		RDFMapper.builder()
+				.set(MappingOptions.IGNORE_CARDINALITY_VIOLATIONS, true)
+				.map(FOAF.ontology().Person, Person.class)
+				.build()
+				.readValue(aGraph, ClassWithMap.class,
+						SimpleValueFactory.getInstance().createIRI("tag:complexible:pinto:06f95e70fea33fcd99e6804b02f96cc9"));
+	}
+
+	@Test
+	public void testReadMapsWithException4() throws Exception {
+
+		final Model aGraph = ModelIO.read(Files3.classPath("/data/map.nt").toPath());
+
+		RDFMapper.builder()
+				.set(MappingOptions.IGNORE_CARDINALITY_VIOLATIONS, true)
+				.map(FOAF.ontology().Person, Person.class)
+				.build()
+				.readValue(aGraph, ClassWithMap.class,
+						SimpleValueFactory.getInstance().createIRI("tag:complexible:pinto:06f95e70fea33fcd99e6804b02f96cc9"));
+	}
+
+	@Test
+	public void testCollectionFactory() {
+		RDFMapper.Builder builder = new RDFMapper.Builder();
+
+		RDFMapper.CollectionFactory mockFactory = mock(RDFMapper.CollectionFactory.class);
+
+		RDFMapper.Builder result = builder.collectionFactory(mockFactory);
+
+		assertEquals(builder, result);
+	}
+
+	@Test
+	public void testMapFactory() {
+		RDFMapper.Builder builder = new RDFMapper.Builder();
+
+		RDFMapper.MapFactory mockFactory = mock(RDFMapper.MapFactory.class);
+
+		RDFMapper.Builder result = builder.mapFactory(mockFactory);
+
+		assertEquals(builder, result);
+	}
+
+	@Test
+	public void testValueFactory() {
+		RDFMapper.Builder builder = new RDFMapper.Builder();
+
+		ValueFactory mockFactory = mock(ValueFactory.class);
+
+		RDFMapper.Builder result = builder.valueFactory(mockFactory);
+
+		assertEquals(builder, result);
+	}
+
+	@Test
+	public void testNamespace_ValidURIAndPrefix() {
+		RDFMapper.Builder builder = new RDFMapper.Builder();
+
+		String prefix = "ex";
+		String namespace = "http://example.com/";
+
+		RDFMapper.Builder result = builder.namespace(prefix, namespace);
+
+		Map<String, String> expectedNamespaces = new HashMap<>();
+		expectedNamespaces.put(prefix, namespace);
+
+		assertEquals(builder, result);
+	}
+
+	@Test
+	public void testNamespace_InvalidURI() {
+		// Create an instance of the Builder class
+		RDFMapper.Builder builder = new RDFMapper.Builder();
+
+		// Set up an invalid URI
+		String prefix = "ex";
+		String invalidNamespace = "\\///";
+
+		// Verify that an IllegalArgumentException is thrown with the expected message
+		IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
+				builder.namespace(prefix, invalidNamespace));
+		assertEquals("namespace must be a valid URI", exception.getMessage());
+	}
+
+	@Test
+	public void testNamespace_InvalidPrefix() {
+		// Create an instance of the Builder class
+		RDFMapper.Builder builder = new RDFMapper.Builder();
+
+		// Set up an invalid prefix
+		String invalidPrefix = "ex!";
+
+		// Verify that an IllegalArgumentException is thrown with the expected message
+		IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
+				builder.namespace(invalidPrefix, "http://example.com/"));
+		assertEquals(invalidPrefix + " is not a valid namespace prefix", exception.getMessage());
+	}
+
+	@Test
+	public void testNamespace_FromNamespaceObject() {
+		RDFMapper.Builder builder = new RDFMapper.Builder();
+
+		Namespace mockNamespace = mock(Namespace.class);
+		String prefix = "ex";
+		String namespace = "http://example.com/";
+		when(mockNamespace.getPrefix()).thenReturn(prefix);
+
+		RDFMapper.Builder result = builder.namespace(mockNamespace);
+
+		Map<String, String> expectedNamespaces = new HashMap<>();
+		expectedNamespaces.put(prefix, namespace);
+
+		assertEquals(builder, result);
+	}
+
 
 	public static final class Files3 {
 		public static File classPath(final String thePath) {
