@@ -35,6 +35,64 @@ build tools to maximize our development efficiency and ensure the robustness of 
 
 
 
+## Issue: Generate Code Coverage Report
+
+### Overview
+
+- Framework: JaCoCo
+    - Tool Version: 0.8.10
+
+The code coverage report for the our gradle project provides insights into the extent of code coverage achieved during the testing phase. The project utilizes JaCoCo (Java Code Coverage) library, a popular code coverage framework, with a specified tool version of 0.8.10.
+
+By analyzing the report, we could identify the percentage of code covered by tests, pinpoint specific areas with low coverage, and prioritize our efforts to improve the test suite. The report typically includes metrics such as the overall coverage percentage, coverage trends over time, and specific coverage details for each class or package.
+
+To run code coverage suit run following command: `./gradlew jacocoTestReport ` This will generate `html` file under `build/reports/jacoco/test/html/index.html`
+
+### Main Results
+
+### Coverage metrics for the "com.complexible.pinto" package:
+
+![jacoco report](jacoco-report.png)
+
+- Instructions Coverage: 81%
+- Branches Coverage: 73%
+- Cyclomatic Complexity: 198
+- Lines of Code: 489
+- Number of Methods: 51
+- Number of Classes: 8
+
+These metrics provide a snapshot of the code coverage achieved within the "com.complexible.pinto" package. The Instructions Coverage indicates that 81% of the instructions within the package have been executed by the tests. Similarly, the Branches Coverage indicates that 73% of the branch points have been exercised.
+
+The Cyclomatic Complexity metric measures the complexity of the code based on the number of decision points and flow control statements. A value of 198 suggests that the code within the package has a moderate level of complexity.
+
+The Lines of Code metric counts the total number of lines of code covered within the package, which in this case is 489. The Number of Methods indicates the count of methods defined and covered within the package, which is 51. Finally, the Number of Classes signifies the total number of classes present in the "com.complexible.pinto" package, which is 8.
+
+
+### Coverage metrics for the "RDFMapper" class:
+
+![jacoco-report-rdfMapper](jacoco-report-rdfMapper.png)
+
+- Instructions Coverage: 80%
+- Branches Coverage: 73%
+- Cyclomatic Complexity: 166
+- Lines of Code: 401
+- Number of Methods: 27
+- Number of Classes: 1
+
+These metrics provide an overview of the code coverage achieved within the RDFMapper class. The Instructions Coverage metric indicates that 80% of the instructions within the class have been executed by the tests. The Branches Coverage metric signifies that 73% of the branch points within the class have been exercised.
+
+The Cyclomatic Complexity metric measures the complexity of the code based on the number of decision points and flow control statements. A value of 166 suggests that the RDFMapper class has a moderate level of complexity.
+
+The Lines of Code metric represents the total number of covered lines within the RDFMapper class, which amounts to 401 lines. The Number of Methods metric indicates that there are 27 methods defined and covered within the class. Lastly, the Number of Classes metric indicates that there is only one class present, which is the RDFMapper class itself.
+
+### Lessons Learnt
+
+These metrics help in evaluating the overall quality of the testing efforts and provide insights into the coverage achieved at different levels within the Pinto project. They can guide us in identifying areas of the code that require further testing and optimization to improve overall code coverage.
+
+
+
+
+
 # Untitled
 
 ### **Static Analysis with CodeClimate Tool**
