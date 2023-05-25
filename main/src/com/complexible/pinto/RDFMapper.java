@@ -221,6 +221,30 @@ public final class RDFMapper {
 		}
 	}
 
+	private void processMapEntry(Model theGraph, Value aMapEntry, Map<Object, Object> aMap) {
+		final Value aKey = theGraph.stream()
+				.filter(Statements.subjectIs((Resource) aMapEntry).and(Statements.predicateIs(KEY)))
+				.map(Statement::getObject)
+				.findFirst()
+				.orElse(null);
+		final Value aValue = theGraph.stream()
+				.filter(Statements.subjectIs((Resource) aMapEntry).and(Statements.predicateIs(VALUE)))
+				.map(Statement::getObject)
+				.findFirst()
+				.orElse(null);
+
+		Object aKeyObj = processValue(theGraph, aKey);
+		Object aValueObj = processValue(theGraph, aValue);
+
+		if (aKeyObj == null || aValueObj == null) {
+			LOGGER.warn("Skipping map entry, key or value could not be created.");
+			return;
+		}
+
+		aMap.put(aKeyObj, aValueObj);
+	}
+
+
 
 	/**
 	 * Read the object from the RDF
@@ -299,20 +323,7 @@ public final class RDFMapper {
 				final Map aMap = mMapFactory.create(aDescriptor);
 
 				for (Value aMapEntry : theGraph.filter((Resource) aPropValue, HAS_ENTRY, null).objects()) {
-					final Value aKey = theGraph.stream().filter(Statements.subjectIs((Resource) aMapEntry).and(Statements.predicateIs(KEY))).map(Statement::getObject).findFirst().orElse(null);
-					final Value aValue = theGraph.stream().filter(Statements.subjectIs((Resource) aMapEntry).and(Statements.predicateIs(VALUE))).map(Statement::getObject).findFirst().orElse(null);
-
-					Object aKeyObj = null, aValueObj = null;
-
-					aKeyObj = processValue(theGraph, aKey);
-					aValueObj = processValue(theGraph, aValue);
-
-					if (aKeyObj == null || aValueObj == null) {
-						LOGGER.warn("Skipping map entry, key or value could not be created.");
-						continue;
-					}
-
-					aMap.put(aKeyObj, aValueObj);
+					processMapEntry(theGraph, aMapEntry, aMap);
 				}
 
 				aObj = aMap;
