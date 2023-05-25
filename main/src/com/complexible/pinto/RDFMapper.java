@@ -212,6 +212,16 @@ public final class RDFMapper {
 		return false;
 	}
 
+
+	private Object processValue(Model theGraph, Value value) {
+		if (value instanceof Literal) {
+			return valueToObject(value, theGraph, null);
+		} else {
+			return readValue(theGraph, type(theGraph, (Resource) value), (Resource) value);
+		}
+	}
+
+
 	/**
 	 * Read the object from the RDF
 	 *
@@ -294,20 +304,8 @@ public final class RDFMapper {
 
 					Object aKeyObj = null, aValueObj = null;
 
-					if (aKey instanceof Literal) {
-						// ok to pass null here, it won't be used
-						aKeyObj = valueToObject(aKey, theGraph, null);
-					}
-					else {
-						aKeyObj = readValue(theGraph, type(theGraph, (Resource) aKey), (Resource) aKey);
-					}
-
-					if (aValue instanceof Literal) {
-						aValueObj = valueToObject(aValue, theGraph, null);
-					}
-					else {
-						aValueObj = readValue(theGraph, type(theGraph, (Resource) aValue), (Resource) aValue);
-					}
+					aKeyObj = processValue(theGraph, aKey);
+					aValueObj = processValue(theGraph, aValue);
 
 					if (aKeyObj == null || aValueObj == null) {
 						LOGGER.warn("Skipping map entry, key or value could not be created.");
