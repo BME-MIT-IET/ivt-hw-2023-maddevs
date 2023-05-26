@@ -14,6 +14,8 @@
  */
 
 package com.complexible.pinto;
+
+import com.complexible.common.base.Dates;
 import com.complexible.common.base.Option;
 import com.complexible.common.base.Options;
 import com.complexible.common.beans.Beans;
@@ -24,7 +26,6 @@ import com.complexible.common.openrdf.util.ResourceBuilder;
 import com.complexible.common.reflect.Classes;
 import com.complexible.common.reflect.Methods;
 import com.complexible.common.util.Namespaces;
-import com.complexible.common.utils.Dates2;
 import com.complexible.pinto.annotations.Iri;
 import com.complexible.pinto.annotations.RdfId;
 import com.complexible.pinto.annotations.RdfProperty;
@@ -49,12 +50,13 @@ import sun.reflect.generics.reflectiveObjects.WildcardTypeImpl;
 import java.beans.PropertyDescriptor;
 import java.lang.reflect.*;
 import java.net.URISyntaxException;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
-
 
 /**
  * <p>Mapper for turning Java beans into RDF and RDF into Java beans.</p>
@@ -71,7 +73,7 @@ public final class RDFMapper {
     public static final IRI VALUE = SimpleValueFactory.getInstance().createIRI(DEFAULT_NAMESPACE, "_value");
     public static final IRI HAS_ENTRY = SimpleValueFactory.getInstance().createIRI(DEFAULT_NAMESPACE, "_hasEntry");
     /**
-     * The logger for monitoring and debugging purposes
+     * The logger
      */
     private static final Logger LOGGER = LoggerFactory.getLogger(RDFMapper.class);
     private static final ImmutableSet<IRI> INTEGER_TYPES = ImmutableSet.of(XMLSchema.INT, XMLSchema.INTEGER, XMLSchema.POSITIVE_INTEGER,
@@ -168,9 +170,8 @@ public final class RDFMapper {
     private <T> T newInstance(final Class<T> theClass) {
         try {
             return theClass.newInstance();
-        }
-        catch (InstantiationException  |  IllegalAccessException e) {
-            throw new RDFMappingException(String.format("Could not create an instance of %s, it does not have a default constructor", theClass),e);
+        } catch (Exception e) {
+            throw new RDFMappingException(String.format("Could not create an instance of %s, it does not have a default constructor", theClass));
         }
     }
 
@@ -225,102 +226,92 @@ public final class RDFMapper {
         final T aInst = newInstance(theClass);
 
         if (aInst instanceof Identifiable) {
-            ((Identifiable)aInst).id(theObj);
+            ((Identifiable) aInst).id(theObj);
         }
 
         for (PropertyDescriptor aDescriptor : PropertyUtils.getPropertyDescriptors(aInst)) {
-            try{
-                if (isIgnored(aDescriptor)) {
-                    continue;
-                }
+            if (isIgnored(aDescriptor)) {
+                continue;
+            }
 
-                final IRI aProperty = getProperty(aDescriptor);
+            final IRI aProperty = getProperty(aDescriptor);
 
-                Collection<Value> aValues = theGraph.stream().filter(Statements.subjectIs(theObj).and(Statements.predicateIs(aProperty))).map(Statement::getObject).collect(Collectors.toList());
+            Collection<Value> aValues = theGraph.stream().filter(Statements.subjectIs(theObj).and(Statements.predicateIs(aProperty))).map(Statement::getObject).collect(Collectors.toList());
 
-                Object aObj;
+            Object aObj;
 
-                if (aValues.isEmpty()) {
-                    continue;
-                }
-                else if (Collection.class.isAssignableFrom(aDescriptor.getPropertyType())) {
-                    final Collection aIterable = mCollectionFactory.create(aDescriptor);
+            if (aValues.isEmpty()) {
+                continue;
+            } else if (Collection.class.isAssignableFrom(aDescriptor.getPropertyType())) {
+                final Collection aIterable = mCollectionFactory.create(aDescriptor);
 
-                    Collection<Value> aElems = Lists.newArrayListWithCapacity(aValues.size());
+                Collection<Value> aElems = Lists.newArrayListWithCapacity(aValues.size());
 
-                    // this will allow the mixing of RDF lists of values with single values.  in "well-formed" data that
-                    // kind of mixing probably won't ever happen.  but it's easier/better to be lax about what we'll accept
-                    // here, and this will cover one or more list assertions as well as multiple property assertions forming
-                    // the list as well as the mix of both
-                    for (Value aValue : aValues) {
-                        if (aValue instanceof Resource && Models2.isList(theGraph, (Resource) aValue)) {
-                            aElems.addAll(Models2.asList(theGraph, (Resource) aValue));
-                        }
-                        else {
-                            aElems.add(aValue);
-                        }
+                // this will allow the mixing of RDF lists of values with single values.  in "well-formed" data that
+                // kind of mixing probably won't ever happen.  but it's easier/better to be lax about what we'll accept
+                // here, and this will cover one or more list assertions as well as multiple property assertions forming
+                // the list as well as the mix of both
+                for (Value aValue : aValues) {
+                    if (aValue instanceof Resource && Models2.isList(theGraph, (Resource) aValue)) {
+                        aElems.addAll(Models2.asList(theGraph, (Resource) aValue));
+                    } else {
+                        aElems.add(aValue);
                     }
-
-                    aElems.stream()
-                            .map(toObject(theGraph, aDescriptor)::apply)
-                            .forEach(aIterable::add);
-
-                    aObj = aIterable;
                 }
-                else if (Map.class.isAssignableFrom(aDescriptor.getPropertyType())) {
-                    Value aPropValue = handleCardinalityViolations(aDescriptor, aValues);
 
+                aElems.stream()
+                        .map(toObject(theGraph, aDescriptor)::apply)
+                        .forEach(aIterable::add);
 
-                    final Map aMap = mMapFactory.create(aDescriptor);
-
-                    for (Value aMapEntry : theGraph.filter((Resource) aPropValue, HAS_ENTRY, null).objects()) {
-                        processMapEntry(theGraph, aMapEntry, aMap);
+                aObj = aIterable;
+            } else if (Map.class.isAssignableFrom(aDescriptor.getPropertyType())) {
+                if (aValues.size() > 1) {
+                    if (mMappingOptions.is(MappingOptions.IGNORE_CARDINALITY_VIOLATIONS)) {
+                        LOGGER.warn("Property type of {} is Map, expected a single value, but {} were found.  MappingOptions is set to ignore this, so using only the first value.",
+                                aDescriptor.getName(), aValues.size());
+                    } else {
+                        throw new RDFMappingException(String.format("%s values found, but property type is Map, one value expected",
+                                aValues.size()));
                     }
-
-                    aObj = aMap;
-                }
-                else {
-                    final Value aValue = handleCardinalityViolations(aDescriptor, aValues);
-
-                    aObj = valueToObject(aValue, theGraph, aDescriptor);
                 }
 
+                Value aPropValue = aValues.iterator().next();
 
+                final Map aMap = mMapFactory.create(aDescriptor);
+
+                for (Value aMapEntry : theGraph.filter((Resource) aPropValue, HAS_ENTRY, null).objects()) {
+                    processMapEntry(theGraph, aMapEntry, aMap);
+                }
+
+                aObj = aMap;
+            } else {
+                if (aValues.size() > 1) {
+                    if (mMappingOptions.is(MappingOptions.IGNORE_CARDINALITY_VIOLATIONS)) {
+                        LOGGER.warn("Property type of {} is {}, expected a single value, but {} were found.  MappingOptions is set to ignore this, so using only the first value.",
+                                aDescriptor.getName(), aDescriptor.getPropertyType(), aValues.size());
+                    } else {
+                        throw new RDFMappingException(String.format("%s values found, but property type is %s",
+                                aValues.size(), aDescriptor.getPropertyType()));
+                    }
+                }
+
+                final Value aValue = aValues.iterator().next();
+
+                aObj = valueToObject(aValue, theGraph, aDescriptor);
+            }
+
+            try {
                 // this will fail spectacularly if there is a mismatch between the incoming RDF and what the bean
                 // defines.  we can either check that eagerly and fail spectacularly then, or do it here and be
                 // lazy.  we'll go with lazy
                 PropertyUtils.setProperty(aInst, aDescriptor.getName(), aObj);
-            }
-            catch (IllegalAccessException e) {
-                throw new RDFMappingException("Illegal access while setting property: " + aDescriptor.getName(), e);
-            }
-            catch (InvocationTargetException e) {
-                throw new RDFMappingException("Exception thrown by an invoked method or constructor while setting property: " + aDescriptor.getName(), e);
-            }
-            catch (NoSuchMethodException e) {
-                throw new RDFMappingException("No such method while setting property: " + aDescriptor.getName(), e);
-            }
-            catch (Exception e) {
+            } catch (Exception e) {
                 Throwables.propagateIfInstanceOf(e, RDFMappingException.class);
                 throw new RDFMappingException(e);
             }
         }
 
         return aInst;
-    }
-
-    private Value handleCardinalityViolations(PropertyDescriptor aDescriptor, Collection<Value> aValues) {
-        if (aValues.size() > 1) {
-            if (mMappingOptions.is(MappingOptions.IGNORE_CARDINALITY_VIOLATIONS)) {
-                LOGGER.warn("Property type of {} is {}, expected a single value, but {} were found.  MappingOptions is set to ignore this, so using only the first value.",
-                        aDescriptor.getName(), aDescriptor.getPropertyType(), aValues.size());
-            } else {
-                throw new RDFMappingException(String.format("%s values found, but property type is %s",
-                        aValues.size(), aDescriptor.getPropertyType()));
-            }
-        }
-
-        return aValues.iterator().next();
     }
 
     private Class type(final Model theGraph, final Resource theValue) {
@@ -424,15 +415,38 @@ public final class RDFMapper {
 
         if (Beans.isPrimitive(theObj)) {
             theBuilder.addProperty(theProperty, toLiteral(theObj, getPropertyAnnotation(thePropertyDescriptor)));
-        }
-        else if (Enum.class.isAssignableFrom(theObj.getClass())) {
+        } else if (Enum.class.isAssignableFrom(theObj.getClass())) {
             theBuilder.addProperty(theProperty, enumToURI((Enum) theObj));
-        }
-        else if (Collection.class.isAssignableFrom(theObj.getClass())) {
-            handleCollection(theGraph, theBuilder, theProperty, theObj, thePropertyDescriptor);
+        } else if (Collection.class.isAssignableFrom(theObj.getClass())) {
+            final Collection aCollection = (Collection) theObj;
 
-        }
-        else if (Map.class.isAssignableFrom(theObj.getClass())) {
+            if (serializeCollectionsAsRDFList(thePropertyDescriptor)) {
+                List<Value> aList = Lists.newArrayListWithExpectedSize(aCollection.size());
+
+                for (Object aVal : aCollection) {
+                    if (Beans.isPrimitive(aVal)) {
+                        aList.add(toLiteral(aVal, getPropertyAnnotation(thePropertyDescriptor)));
+                    } else {
+                        ResourceBuilder aIndividual = write(aVal);
+                        aList.add(aIndividual.getResource());
+                        theBuilder.model().addAll(aIndividual.model());
+                    }
+                }
+
+                if (!aList.isEmpty()) {
+                    theBuilder.addProperty(theProperty, Models2.toList(aList, theBuilder.model()));
+                }
+            } else {
+                for (Object aVal : aCollection) {
+                    // this would not handle collections of collections, does that matter?
+                    if (Beans.isPrimitive(aVal)) {
+                        theBuilder.addProperty(theProperty, toLiteral(aVal, getPropertyAnnotation(thePropertyDescriptor)));
+                    } else {
+                        theBuilder.addProperty(theProperty, write(aVal));
+                    }
+                }
+            }
+        } else if (Map.class.isAssignableFrom(theObj.getClass())) {
             Map aMap = (Map) theObj;
 
             if (!aMap.isEmpty()) {
@@ -448,62 +462,20 @@ public final class RDFMapper {
 
                 theBuilder.addProperty(theProperty, aRes);
             }
-        }
-        else {
+        } else {
             RDFCodec aCodex = mCodecs.get(theObj.getClass());
             if (aCodex != null) {
                 final Value aValue = aCodex.writeValue(theObj);
 
                 if (aValue instanceof ResourceBuilder) {
                     theBuilder.addProperty(theProperty, (ResourceBuilder) aValue);
-                }
-                else {
+                } else {
                     theBuilder.addProperty(theProperty, aValue);
                 }
-            }
-            else {
+            } else {
                 theBuilder.addProperty(theProperty, write(theObj));
             }
         }
-    }
-
-
-    private void handleCollection(final ModelBuilder theGraph, final ResourceBuilder theBuilder,
-                                  final IRI theProperty, final Object theObj,
-                                  final PropertyDescriptor thePropertyDescriptor) {
-
-        final Collection aCollection = (Collection) theObj;
-
-        if (serializeCollectionsAsRDFList(thePropertyDescriptor)) {
-            List<Value> aList = Lists.newArrayListWithExpectedSize(aCollection.size());
-
-            for (Object aVal : aCollection) {
-                if (Beans.isPrimitive(aVal)) {
-                    aList.add(toLiteral(aVal, getPropertyAnnotation(thePropertyDescriptor)));
-                }
-                else {
-                    ResourceBuilder aIndividual = write(aVal);
-                    aList.add(aIndividual.getResource());
-                    theBuilder.model().addAll(aIndividual.model());
-                }
-            }
-
-            if (!aList.isEmpty()) {
-                theBuilder.addProperty(theProperty, Models2.toList(aList, theBuilder.model()));
-            }
-        }
-        else {
-            for (Object aVal : aCollection) {
-                // this would not handle collections of collections, does that matter?
-                if (Beans.isPrimitive(aVal)) {
-                    theBuilder.addProperty(theProperty, toLiteral(aVal, getPropertyAnnotation(thePropertyDescriptor)));
-                }
-                else {
-                    theBuilder.addProperty(theProperty, write(aVal));
-                }
-            }
-        }
-
     }
 
     private IRI enumToURI(final Enum theEnum) {
@@ -516,7 +488,7 @@ public final class RDFMapper {
                 return mValueFactory.createIRI(mDefaultNamespace, theEnum.name());
             }
         } catch (NoSuchFieldException e) {
-            throw new AssertionError("Field not found for enum " + theEnum.name() + " in " + theEnum.getClass().getName(), e);
+            throw new AssertionError();
         }
     }
 
@@ -552,12 +524,78 @@ public final class RDFMapper {
 
     private Object valueToObject(final Value theValue, final Model theGraph, final PropertyDescriptor theDescriptor) {
         if (theValue instanceof Literal) {
-            return handleLiteral(theValue, theDescriptor);
-        }
-        else if (theDescriptor != null && Enum.class.isAssignableFrom(theDescriptor.getPropertyType())) {
-            return handleEnum(theValue, theDescriptor);
-        }
-        else {
+            final Literal aLit = (Literal) theValue;
+            final IRI aDatatype = aLit.getDatatype() != null ? aLit.getDatatype() : null;
+
+            if (aDatatype == null || XMLSchema.STRING.equals(aDatatype) || RDFS.LITERAL.equals(aDatatype)) {
+                String aStr = aLit.getLabel();
+
+                if (theDescriptor != null && Character.TYPE.isAssignableFrom(theDescriptor.getPropertyType())) {
+                    if (aStr.length() == 1) {
+                        return aStr.charAt(0);
+                    } else {
+                        throw new RDFMappingException("Bean type is char, but value is a a string.");
+                    }
+                } else {
+                    return aStr;
+                }
+            } else if (XMLSchema.BOOLEAN.equals(aDatatype)) {
+                return Boolean.valueOf(aLit.getLabel());
+            } else if (INTEGER_TYPES.contains(aDatatype)) {
+                return Integer.parseInt(aLit.getLabel());
+            } else if (LONG_TYPES.contains(aDatatype)) {
+                return Long.parseLong(aLit.getLabel());
+            } else if (XMLSchema.DOUBLE.equals(aDatatype)) {
+                return Double.valueOf(aLit.getLabel());
+            } else if (FLOAT_TYPES.contains(aDatatype)) {
+                return Float.valueOf(aLit.getLabel());
+            } else if (SHORT_TYPES.contains(aDatatype)) {
+                return Short.valueOf(aLit.getLabel());
+            } else if (BYTE_TYPES.contains(aDatatype)) {
+                return Byte.valueOf(aLit.getLabel());
+            } else if (XMLSchema.ANYURI.equals(aDatatype)) {
+                try {
+                    return new java.net.URI(aLit.getLabel());
+                } catch (URISyntaxException e) {
+                    LOGGER.warn("URI syntax exception converting literal value which is not a valid URI {} ", aLit.getLabel());
+                    return null;
+                }
+            } else if (XMLSchema.DATE.equals(aDatatype) || XMLSchema.DATETIME.equals(aDatatype)) {
+                return Dates2.asDate(aLit.getLabel());
+            } else if (XMLSchema.TIME.equals(aDatatype)) {
+                return new Date(Long.parseLong(aLit.getLabel()));
+            } else {
+                throw new RuntimeException("Unsupported or unknown literal datatype: " + aLit);
+            }
+        } else if (theDescriptor != null && Enum.class.isAssignableFrom(theDescriptor.getPropertyType())) {
+            IRI aURI = (IRI) theValue;
+            Object[] aEnums = theDescriptor.getPropertyType().getEnumConstants();
+            for (Object aObj : aEnums) {
+                if (((Enum) aObj).name().equals(aURI.getLocalName())) {
+                    return aObj;
+                }
+            }
+
+            for (Field aField : theDescriptor.getPropertyType().getFields()) {
+                Iri aAnnotation = aField.getAnnotation(Iri.class);
+                if (aAnnotation != null && aURI.equals(iri(aAnnotation.value()))) {
+                    for (Object aObj : aEnums) {
+                        if (((Enum) aObj).name().equals(aField.getName())) {
+                            return aObj;
+                        }
+                    }
+
+                    // if the uri in the Iri annotation equals the value we're converting, but there was no field
+                    // match, something bad has happened
+                    throw new RDFMappingException("Expected enum value not found");
+                }
+            }
+
+            LOGGER.info("{} maps to the enum {}, but does not correspond to any of the values of the enum.",
+                    aURI, theDescriptor.getPropertyType());
+
+            return null;
+        } else {
             Resource aResource = (Resource) theValue;
 
             final Class aClass = pinpointClass(theGraph, aResource, theDescriptor);
@@ -565,101 +603,10 @@ public final class RDFMapper {
             RDFCodec aCodec = mCodecs.get(aClass);
             if (aCodec != null) {
                 return aCodec.readValue(theGraph, aResource);
-            }
-            else {
+            } else {
                 return readValue(theGraph, aClass, aResource);
             }
         }
-    }
-
-    private Object handleLiteral(final Value theValue, final PropertyDescriptor theDescriptor) {
-        final Literal aLit = (Literal) theValue;
-
-        final IRI aDatatype = aLit.getDatatype() != null ? aLit.getDatatype() : null;
-
-        if (aDatatype == null || XMLSchema.STRING.equals(aDatatype) || RDFS.LITERAL.equals(aDatatype)) {
-            String aStr = aLit.getLabel();
-
-            if (theDescriptor != null && Character.TYPE.isAssignableFrom(theDescriptor.getPropertyType())) {
-                if (aStr.length() == 1) {
-                    return aStr.charAt(0);
-                }
-                else {
-                    throw new RDFMappingException("Bean type is char, but value is a a string.");
-                }
-            }
-            else {
-                return aStr;
-            }
-        }
-        else if (XMLSchema.BOOLEAN.equals(aDatatype)) {
-            return Boolean.valueOf(aLit.getLabel());
-        }
-        else if (INTEGER_TYPES.contains(aDatatype)) {
-            return Integer.parseInt(aLit.getLabel());
-        }
-        else if (LONG_TYPES.contains(aDatatype)) {
-            return Long.parseLong(aLit.getLabel());
-        }
-        else if (XMLSchema.DOUBLE.equals(aDatatype)) {
-            return Double.valueOf(aLit.getLabel());
-        }
-        else if (FLOAT_TYPES.contains(aDatatype)) {
-            return Float.valueOf(aLit.getLabel());
-        }
-        else if (SHORT_TYPES.contains(aDatatype)) {
-            return Short.valueOf(aLit.getLabel());
-        }
-        else if (BYTE_TYPES.contains(aDatatype)) {
-            return Byte.valueOf(aLit.getLabel());
-        }
-        else if (XMLSchema.ANYURI.equals(aDatatype)) {
-            try {
-                return new java.net.URI(aLit.getLabel());
-            }
-            catch (URISyntaxException e) {
-                LOGGER.warn("URI syntax exception converting literal value which is not a valid URI {} ", aLit.getLabel());
-                return null;
-            }
-        }
-        else if (XMLSchema.DATE.equals(aDatatype) || XMLSchema.DATETIME.equals(aDatatype)) {
-            return Dates2.asDate(aLit.getLabel());
-        }
-        else if (XMLSchema.TIME.equals(aDatatype)) {
-            return new Date(Long.parseLong(aLit.getLabel()));
-        }
-        else {
-            throw new RuntimeException("Unsupported or unknown literal datatype: " + aLit);
-        }
-    }
-    private Object handleEnum(final Value theValue, final PropertyDescriptor theDescriptor) {
-        IRI aURI = (IRI) theValue;
-        Object[] aEnums = theDescriptor.getPropertyType().getEnumConstants();
-        for (Object aObj : aEnums) {
-            if (((Enum) aObj).name().equals(aURI.getLocalName())) {
-                return aObj;
-            }
-        }
-
-        for (Field aField : theDescriptor.getPropertyType().getFields()) {
-            Iri aAnnotation = aField.getAnnotation(Iri.class);
-            if (aAnnotation != null && aURI.equals(iri(aAnnotation.value()))) {
-                for (Object aObj : aEnums) {
-                    if (((Enum) aObj).name().equals(aField.getName())) {
-                        return aObj;
-                    }
-                }
-
-                // if the uri in the Iri annotation equals the value we're converting, but there was no field
-                // match, something bad has happened
-                throw new RDFMappingException("Expected enum value not found");
-            }
-        }
-
-        LOGGER.info("{} maps to the enum {}, but does not correspond to any of the values of the enum.",
-                aURI, theDescriptor.getPropertyType());
-
-        return null;
     }
 
     private Class pinpointClass(final Model theGraph, final Resource theResource, final PropertyDescriptor theDescriptor) {
@@ -740,19 +687,6 @@ public final class RDFMapper {
         return aClass;
     }
 
-
-    /**
-     * Converts the given object to a Value using the specified RDF property annotation.
-     * The method uses the datatype specified in the annotation to create an IRI,
-     * or the type of the object to create a literal value.
-     *
-     * @param theObj the object to be converted to a Value.
-     * @param theAnnotation the RDF property annotation that provides additional
-     *                      information for creating the Value.
-     * @return the created Value, or null if an IRI cannot be created using the
-     *         annotation's datatype.
-     * @throws RDFMappingException if the object type is unsupported.
-     */
     private Value toLiteral(final Object theObj, final RdfProperty theAnnotation) {
         if (theAnnotation != null && !Strings.isNullOrEmpty(theAnnotation.datatype())) {
             final IRI aURI = iri(theAnnotation.datatype());
@@ -775,7 +709,7 @@ public final class RDFMapper {
         } else if (theObj instanceof Float) {
             return mValueFactory.createLiteral(((Float) theObj).floatValue());
         } else if (theObj instanceof Date) {
-            return mValueFactory.createLiteral(Dates2.datetimeISO(((Date) theObj)));
+            return mValueFactory.createLiteral(Dates2.datetimeISO((Date) theObj), XMLSchema.DATETIME);
         } else if (theObj instanceof String) {
             if (theAnnotation != null && !theAnnotation.language().equals("")) {
                 return mValueFactory.createLiteral((String) theObj, theAnnotation.language());
@@ -788,7 +722,7 @@ public final class RDFMapper {
             return mValueFactory.createLiteral(theObj.toString(), XMLSchema.ANYURI);
         }
 
-        throw new RDFMappingException("Unknown or unsupported primitive type: " + theObj.getClass().getName());
+        throw new RDFMappingException("Unknown or unsupported primitive type: " + theObj);
     }
 
     private RdfProperty getPropertyAnnotation(final PropertyDescriptor thePropertyDescriptor) {
@@ -1160,7 +1094,7 @@ public final class RDFMapper {
             try {
                 // try creating a new instance.  this will work if they've specified a concrete type *and* it has a
                 // default constructor, which is true of all the core collections.
-                return (Collection) aType.getDeclaredConstructor().newInstance();
+                return (Collection) aType.newInstance();
             } catch (Throwable e) {
                 if (List.class.isAssignableFrom(aType)) {
                     return Lists.newArrayList();
@@ -1180,5 +1114,18 @@ public final class RDFMapper {
         }
     }
 
+    // todo: move to commons-utils
+    private static final class Dates2 {
+        public static Date asDate(final String theDate) {
+            try {
+                return new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX").parse(theDate);
+            } catch (ParseException pe) {
+                return Dates.asDate(theDate);
+            }
+        }
 
+        public static String datetimeISO(Date theDate) {
+            return new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX").format(theDate);
+        }
+    }
 }
