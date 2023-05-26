@@ -212,6 +212,40 @@ public final class RDFMapper {
 		return false;
 	}
 
+
+	private Object processValue(Model theGraph, Value value) {
+		if (value instanceof Literal) {
+			return valueToObject(value, theGraph, null);
+		} else {
+			return readValue(theGraph, type(theGraph, (Resource) value), (Resource) value);
+		}
+	}
+
+	private void processMapEntry(Model theGraph, Value aMapEntry, Map<Object, Object> aMap) {
+		final Value aKey = theGraph.stream()
+				.filter(Statements.subjectIs((Resource) aMapEntry).and(Statements.predicateIs(KEY)))
+				.map(Statement::getObject)
+				.findFirst()
+				.orElse(null);
+		final Value aValue = theGraph.stream()
+				.filter(Statements.subjectIs((Resource) aMapEntry).and(Statements.predicateIs(VALUE)))
+				.map(Statement::getObject)
+				.findFirst()
+				.orElse(null);
+
+		Object aKeyObj = processValue(theGraph, aKey);
+		Object aValueObj = processValue(theGraph, aValue);
+
+		if (aKeyObj == null || aValueObj == null) {
+			LOGGER.warn("Skipping map entry, key or value could not be created.");
+			return;
+		}
+
+		aMap.put(aKeyObj, aValueObj);
+	}
+
+
+
 	/**
 	 * Read the object from the RDF
 	 *
@@ -289,32 +323,7 @@ public final class RDFMapper {
 				final Map aMap = mMapFactory.create(aDescriptor);
 
 				for (Value aMapEntry : theGraph.filter((Resource) aPropValue, HAS_ENTRY, null).objects()) {
-					final Value aKey = theGraph.stream().filter(Statements.subjectIs((Resource) aMapEntry).and(Statements.predicateIs(KEY))).map(Statement::getObject).findFirst().orElse(null);
-					final Value aValue = theGraph.stream().filter(Statements.subjectIs((Resource) aMapEntry).and(Statements.predicateIs(VALUE))).map(Statement::getObject).findFirst().orElse(null);
-
-					Object aKeyObj = null, aValueObj = null;
-
-					if (aKey instanceof Literal) {
-						// ok to pass null here, it won't be used
-						aKeyObj = valueToObject(aKey, theGraph, null);
-					}
-					else {
-						aKeyObj = readValue(theGraph, type(theGraph, (Resource) aKey), (Resource) aKey);
-					}
-
-					if (aValue instanceof Literal) {
-						aValueObj = valueToObject(aValue, theGraph, null);
-					}
-					else {
-						aValueObj = readValue(theGraph, type(theGraph, (Resource) aValue), (Resource) aValue);
-					}
-
-					if (aKeyObj == null || aValueObj == null) {
-						LOGGER.warn("Skipping map entry, key or value could not be created.");
-						continue;
-					}
-
-					aMap.put(aKeyObj, aValueObj);
+					processMapEntry(theGraph, aMapEntry, aMap);
 				}
 
 				aObj = aMap;

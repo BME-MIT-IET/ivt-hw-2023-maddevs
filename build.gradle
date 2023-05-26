@@ -2,6 +2,13 @@ apply plugin: "idea"
 apply plugin: "java"
 apply plugin: "maven-publish"
 
+//apply plugin: "com.codeclimate.gradle"
+
+//codeClimate {
+//	apiKey = '17c4de70549987d4e6c4447ed045ac66d706c2ef' // Replace with your CodeClimate API key
+//}
+
+
 wrapper {
 	gradleVersion = '8.1.1'
 	distributionUrl = "https://services.gradle.org/distributions/gradle-${gradleVersion}-all.zip"
@@ -49,6 +56,7 @@ dependencies {
 	implementation (group: "com.google.guava", name: "guava", version: '30.0-jre') {
 		exclude group: "com.google.code.findbugs"
 	}
+
 
 	implementation 'commons-beanutils:commons-beanutils:1.9.4'
 	implementation 'commons-codec:commons-codec:1.13'
