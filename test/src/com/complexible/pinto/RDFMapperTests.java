@@ -24,7 +24,9 @@ import com.complexible.pinto.annotations.RdfId;
 import com.complexible.pinto.annotations.RdfProperty;
 import com.complexible.pinto.annotations.RdfsClass;
 import com.complexible.pinto.codecs.UUIDCodec;
+import com.complexible.pinto.factory.CollectionFactory;
 import com.complexible.pinto.impl.IdentifiableImpl;
+import com.complexible.pinto.factory.MapFactory;
 import com.google.common.base.Charsets;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -864,7 +866,7 @@ public class RDFMapperTests {
     public void testCollectionFactory() {
         RDFMapper.Builder builder = new RDFMapper.Builder();
 
-        RDFMapper.CollectionFactory mockFactory = mock(RDFMapper.CollectionFactory.class);
+        CollectionFactory mockFactory = mock(CollectionFactory.class);
 
         RDFMapper.Builder result = builder.collectionFactory(mockFactory);
 
@@ -875,7 +877,7 @@ public class RDFMapperTests {
     public void testMapFactory() {
         RDFMapper.Builder builder = new RDFMapper.Builder();
 
-        RDFMapper.MapFactory mockFactory = mock(RDFMapper.MapFactory.class);
+        MapFactory mockFactory = mock(MapFactory.class);
 
         RDFMapper.Builder result = builder.mapFactory(mockFactory);
 

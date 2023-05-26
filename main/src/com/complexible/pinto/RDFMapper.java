@@ -29,6 +29,10 @@ import com.complexible.pinto.annotations.Iri;
 import com.complexible.pinto.annotations.RdfId;
 import com.complexible.pinto.annotations.RdfProperty;
 import com.complexible.pinto.annotations.RdfsClass;
+import com.complexible.pinto.factory.CollectionFactory;
+import com.complexible.pinto.factory.DefaultCollectionFactory;
+import com.complexible.pinto.factory.DefaultMapFactory;
+import com.complexible.pinto.factory.MapFactory;
 import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
@@ -922,30 +926,6 @@ public final class RDFMapper {
     }
 
     /**
-     * <p>A factory for creating instances of {@link Collection} when {@link #readValue(Model, Class) reading} an object.</p>
-     *
-     * @author Michael Grove
-     * @version 1.0
-     * @see DefaultCollectionFactory
-     * @since 1.0
-     */
-    public interface CollectionFactory {
-        Collection create(final PropertyDescriptor thePropertyDescriptor);
-    }
-
-    /**
-     * <p>A factory for creating instances of {@link Map} when {@link #readValue(Model, Class) reading} an object.</p>
-     *
-     * @author Michael Grove
-     * @version 1.0
-     * @see DefaultMapFactory
-     * @since 1.0
-     */
-    public interface MapFactory {
-        Map create(final PropertyDescriptor theDescriptor);
-    }
-
-    /**
      * Builder object for creating an {@link RDFMapper}
      *
      * @author Michael Grove
@@ -1115,70 +1095,7 @@ public final class RDFMapper {
         }
     }
 
-    /**
-     * <p>Default implementation of a {@link MapFactory} which relies on {@link Class#newInstance()} and falls back
-     * to creating a {@link LinkedHashMap} when that fails.</p>
-     *
-     * @author Michael Grove
-     * @version 1.0
-     * @since 1.0
-     */
-    public static class DefaultMapFactory implements MapFactory {
-        @Override
-        public Map create(final PropertyDescriptor theDescriptor) {
-            final Class<?> aType = theDescriptor.getPropertyType();
 
-            try {
-                // try creating a new instance.  this will work if they've specified a concrete type *and* it has a
-                // default constructor, which is true of all the core maps.
-                return (Map) aType.newInstance();
-            } catch (Throwable e) {
-                LOGGER.warn("{} uses a map type, but it cannot be instantiated, using a default LinkedHashMap", theDescriptor);
-            }
-
-            return Maps.newLinkedHashMap();
-        }
-    }
-
-    /**
-     * <p>Default implementation of a {@link CollectionFactory}.  Uses {@link Class#newInstance()}, but when that
-     * fails, it will fall back to creating a default type for each basic type of {@code Collection}.  For {@code List}
-     * an {@link ArrayList} is used, for {@code Set} a {@link LinkedHashSet}, for {@code SortedSet} a {@link TreeSet}, and
-     * for any other type of {@code Collection}, a {@link LinkedHashSet}.</p>
-     *
-     * @author Michael Grove
-     * @version 1.0
-     * @since 1.0
-     */
-    public static class DefaultCollectionFactory implements CollectionFactory {
-        /**
-         * {@inheritDoc}
-         */
-        @Override
-        public Collection create(final PropertyDescriptor thePropertyDescriptor) {
-            final Class<?> aType = thePropertyDescriptor.getPropertyType();
-            try {
-                // try creating a new instance.  this will work if they've specified a concrete type *and* it has a
-                // default constructor, which is true of all the core collections.
-                return (Collection) aType.getDeclaredConstructor().newInstance();
-            } catch (Throwable e) {
-                if (List.class.isAssignableFrom(aType)) {
-                    return Lists.newArrayList();
-                } else if (Set.class.isAssignableFrom(aType)) {
-                    if (SortedSet.class.isAssignableFrom(aType)) {
-                        return Sets.newTreeSet();
-                    } else {
-                        return Sets.newLinkedHashSet();
-                    }
-                } else if (Collection.class.equals(aType)) {
-                    return Sets.newLinkedHashSet();
-                } else {
-                    // what else could there be?
-                    throw new RuntimeException("Unknown or unsupported collection type for a field: " + aType);
-                }
-            }
-        }
-    }
 
 
 }
