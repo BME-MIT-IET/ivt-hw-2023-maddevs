@@ -208,3 +208,59 @@ By refactoring the code in the **`RDFMapper`** class, we have successfully elimi
 ![afterFixing](codeClimateScreenshots/afterFixing.png)
 
 By utilizing the CodeClimate tool and actively addressing the identified issues, we proactively maintained a high standard of code quality, ensuring that our codebase remains clean, maintainable, and efficient.
+
+
+## Issue: Manual code review needed
+### Overview
+
+This issue aims to highlight the necessity of a comprehensive manual code review on certain parts of our application. The focus is to ensure the quality, efficiency, and security of the involved components, making this task a high priority.
+
+### Main Results
+
+
+During the manual code review process, the following areas have been identified as needing attention:
+
+**Comments and Documentation**: The comments could be improved.
+
+**Exception Handling**: In the **`newInstance`** method, all exceptions are caught and then a **`RDFMappingException`** is thrown. This is a bit generic and loses the original exception's stack trace. It would be better to catch specific exceptions and throw a new exception that includes the original exception as its cause.
+
+**Duplicate Code**: In the **`readValue`** method, the way single and multiple values are handled for non-Collection, non-Map properties and Map properties is almost identical. This needs refactoring.
+
+**Error Handling**: In the **`readValue`** method, some potential exceptions are handled in a catch-all block, which may make it difficult to understand and debug specific problems. Consider using more specific catch blocks and provide meaningful error messages.
+
+The **`setValue`** and **`valueToObject`** methods are quite large and perform a variety of different actions depending on the input parameters. Consider breaking these methods into smaller ones, each responsible for one specific task. This will make your code easier to read, test, and maintain.
+
+- The **`valueToObject`** method contains a long list of if-else statements that makes the code complex and hard to read.
+- For **`setValue`** method: In methods like **`handleCollection()`**, **`handleMap()`**, and **`handleObject()`**, you could further extract smaller methods if those methods are still too long and complex. The main goal here is to make each method do one thing and do it well, which is also known as the Single Responsibility Principle (SRP).
+
+In the **`enumToURI`** method, a NoSuchFieldException is caught but an AssertionError is thrown with no message. Providing a meaningful message here could make debugging easier.
+
+For **`valueToObject`**: This simplifies the **`valueToObject`** method and makes it easier to understand the code because the logic for handling different types of values (Literal, Enum, Resource) is separated into their own methods.
+
+The **`toLiteral`** method could use a comment explaining what it does and its parameters.
+
+**Java 8 or newer**: For Java 8, we can use  **`Class.getDeclaredConstructor().newInstance()`** instead of **`Class.newInstance()`**, as the latter is deprecated due to its insufficient exception handling
+
+**Separation of responsibilities**: The **`DefaultCollectionFactory`** and **`Dates2`** classes perform very different functions, and as such, it may be better to separate them into separate files for clarity and to improve maintainability. Dates2 moved to new commons/util package
+- There seems to be recursive call in **`asDate()`** method in case of **`ParseException`**, which can lead to infinite loop if the exception keeps occurring. This is dangerous and should be avoided. Replaced it with the exception:
+- `throw new RuntimeException("Unable to parse date string: " + theDate, pe);`
+
+## Conclusion and Lessons Learned
+
+The code review process has highlighted several areas in the codebase that require improvement. These range from minor issues, such as improving comments and documentation, to more significant structural issues, such as method complexity and code duplication.
+
+Key lessons learned include:
+
+1. **Exception Handling**: It's essential to handle exceptions appropriately, retaining the original exception's stack trace whenever possible for easier debugging. Specific exceptions should be caught and rethrown as new exceptions with the original cause included.
+
+2. **Code Duplication**: It's crucial to avoid duplicating code. If similar code is used in multiple places, it's a sign that the code should be refactored, often into a separate method that can be reused.
+
+3. **Method Complexity**: Large, complex methods should be broken down into smaller, more manageable methods, each with a single responsibility. This approach aligns with the Single Responsibility Principle (SRP) and results in code that is easier to read, test, and maintain.
+
+4. **Error Messages**: Meaningful error messages are essential for understanding and debugging issues. If an AssertionError or other exception type is thrown, it should be accompanied by a useful message.
+
+5. **Code Documentation**: Code comments and documentation should be clear and informative. They should explain what a method does, its parameters, and its return values.
+
+6. **Separation of Responsibilities**: Different functionalities should be separated into different classes or files for clarity and ease of maintenance.
+
+In general, this review emphasized the importance of good software development practices, including the principles of clean code, such as SRP, DRY (Don't Repeat Yourself), and clear documentation. Following these principles will lead to more maintainable, understandable, and efficient code.
