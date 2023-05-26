@@ -26,8 +26,3 @@ cache:
   - '%USERPROFILE%\.gradle\caches'
   - '%USERPROFILE%\.gradle\wrapper'
 
-notifications:
-  - provider: Email
-    on_build_success: false
-    on_build_failure: true
-    on_build_status_changed: false
