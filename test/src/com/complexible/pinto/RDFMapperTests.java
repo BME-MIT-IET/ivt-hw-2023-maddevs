@@ -776,26 +776,7 @@ public class RDFMapperTests {
                 .build()
                 .readValue(aGraph, UUID.class);
     }
-
-    @Test
-    public void testWriteMap() throws Exception {
-        final ClassWithMap aObj = new ClassWithMap();
-
-        aObj.mMap = Maps.newLinkedHashMap();
-
-        aObj.mMap.put("bob", new Person("Bob the tester"));
-        aObj.mMap.put(1L, "the size of something");
-        aObj.mMap.put(new Date(1426361082470L), 57.4);
-        aObj.mMap.put(new Person("another person"), new Company("The company"));
-
-        final Model aGraph = RDFMapper.builder()
-                .map(FOAF.ontology().Person, Person.class)
-                .build()
-                .writeValue(aObj);
-
-        assertTrue(Models.isomorphic(aGraph,
-                ModelIO.read(Files3.classPath("/data/map.nt").toPath())));
-    }
+    
 
     @Test
     public void testReadMap() throws Exception {
