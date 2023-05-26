@@ -1,0 +1,24 @@
+environment:
+  JAVA_HOME: C:\Program Files\OpenJDK\jdk-15.0.1
+
+install:
+  - ps: |
+      choco install openjdk15
+      refreshenv
+      $env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
+      $env:GRADLE_OPTS = '-Dorg.gradle.daemon=false'
+      echo $env:JAVA_HOME
+      echo $env:PATH
+      java -version
+      javac -version
+  - gradlew.bat assemble
+
+build_script:
+  - gradlew.bat build
+
+test_script:
+  - gradlew.bat test
+
+cache:
+  - '%USERPROFILE%\.gradle\caches'
+  - '%USERPROFILE%\.gradle\wrapper'
