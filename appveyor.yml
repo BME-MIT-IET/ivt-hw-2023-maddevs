@@ -1,24 +1,33 @@
-environment:
-  JAVA_HOME: C:\Program Files\OpenJDK\jdk-15.0.1
+version: 1.0.{build}
+image: Visual Studio 2019
 
 install:
   - ps: |
-      choco install openjdk15
+      $url = "https://github.com/AdoptOpenJDK/openjdk15-binaries/releases/download/jdk-15.0.1%2B9/OpenJDK15U-jdk_x64_windows_hotspot_15.0.1_9.zip"
+      $output = "openjdk15.zip"
+      Invoke-WebRequest -Uri $url -OutFile $output
+      7z x $output -oC:\openjdk15
+      Remove-Item $output
+      [Environment]::SetEnvironmentVariable("JAVA_HOME", "C:\openjdk15\jdk-15.0.1+9", "Machine")
       refreshenv
       $env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
-      $env:GRADLE_OPTS = '-Dorg.gradle.daemon=false'
       echo $env:JAVA_HOME
       echo $env:PATH
       java -version
       javac -version
-  - gradlew.bat assemble
 
 build_script:
-  - gradlew.bat build
+  - cmd: gradlew.bat build --info
 
 test_script:
-  - gradlew.bat test
+  - cmd: gradlew.bat test --info
 
 cache:
   - '%USERPROFILE%\.gradle\caches'
   - '%USERPROFILE%\.gradle\wrapper'
+
+notifications:
+  - provider: Email
+    on_build_success: false
+    on_build_failure: true
+    on_build_status_changed: false
