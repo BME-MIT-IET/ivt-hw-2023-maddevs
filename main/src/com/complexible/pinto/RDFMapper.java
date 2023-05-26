@@ -120,10 +120,28 @@ public final class RDFMapper {
 
     private static boolean isIgnored(final PropertyDescriptor thePropertyDescriptor) {
         // we'll ignore getClass() on the bean
-		return thePropertyDescriptor.getName().equals("class")
-				&& thePropertyDescriptor.getReadMethod().getDeclaringClass() == Object.class
-				&& thePropertyDescriptor.getReadMethod().getReturnType().equals(Class.class);
-	}
+        return thePropertyDescriptor.getName().equals("class")
+                && thePropertyDescriptor.getReadMethod().getDeclaringClass() == Object.class
+                && thePropertyDescriptor.getReadMethod().getReturnType().equals(Class.class);
+    }
+
+    /**
+     * Create a new {@link RDFMapper} with the default settings
+     *
+     * @return a new {@code RDFMapper}
+     */
+    public static RDFMapper create() {
+        return builder().build();
+    }
+
+    /**
+     * Return a {@link Builder} for configurating and creating a new {@link RDFMapper}
+     *
+     * @return the builder
+     */
+    public static Builder builder() {
+        return new Builder();
+    }
 
     private Object processValue(Model theGraph, Value value) {
         if (value instanceof Literal) {
@@ -147,24 +165,6 @@ public final class RDFMapper {
         }
 
         aMap.put(aKeyObj, aValueObj);
-    }
-
-    /**
-     * Create a new {@link RDFMapper} with the default settings
-     *
-     * @return a new {@code RDFMapper}
-     */
-    public static RDFMapper create() {
-        return builder().build();
-    }
-
-    /**
-     * Return a {@link Builder} for configurating and creating a new {@link RDFMapper}
-     *
-     * @return the builder
-     */
-    public static Builder builder() {
-        return new Builder();
     }
 
     private <T> T newInstance(final Class<T> theClass) {
@@ -717,7 +717,7 @@ public final class RDFMapper {
                 return mValueFactory.createLiteral((String) theObj, XMLSchema.STRING);
             }
         } else if (theObj instanceof Character) {
-            return mValueFactory.createLiteral(String.valueOf((Character) theObj), XMLSchema.STRING);
+            return mValueFactory.createLiteral(String.valueOf(theObj), XMLSchema.STRING);
         } else if (theObj instanceof java.net.URI) {
             return mValueFactory.createLiteral(theObj.toString(), XMLSchema.ANYURI);
         }
@@ -892,18 +892,12 @@ public final class RDFMapper {
         private final Map<IRI, Class> mMappings = Maps.newHashMap();
 
         private final Map<Class<?>, Function<Object, Resource>> mIdFunctions = Maps.newHashMap();
-
-        private ValueFactory mValueFactory = SimpleValueFactory.getInstance();
-
         private final Options mOptions = Options.combine(MappingOptions.DEFAULTS);
-
         private final Map<String, String> mNamespaces = Maps.newHashMap();
-
-        private CollectionFactory mCollectionFactory = new DefaultCollectionFactory();
-
-        private MapFactory mMapFactory = new DefaultMapFactory();
-
         private final Map<Class<?>, RDFCodec<?>> mCodecs = Maps.newHashMap();
+        private ValueFactory mValueFactory = SimpleValueFactory.getInstance();
+        private CollectionFactory mCollectionFactory = new DefaultCollectionFactory();
+        private MapFactory mMapFactory = new DefaultMapFactory();
 
         public Builder() {
             mNamespaces.put("", DEFAULT_NAMESPACE);
