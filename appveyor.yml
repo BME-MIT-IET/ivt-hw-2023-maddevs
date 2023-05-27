@@ -1,21 +1,20 @@
 version: 1.0.{build}
-image: Visual Studio 2019
+image: Visual Studio 2017
 
 install:
   - ps: |
-      $url = "https://github.com/AdoptOpenJDK/openjdk15-binaries/releases/download/jdk-15.0.1%2B9/OpenJDK15U-jdk_x64_windows_hotspot_15.0.1_9.zip"
-      $output = "openjdk15.zip"
+      $url = "https://github.com/ojdkbuild/ojdkbuild/releases/download/1.8.0.292-1/java-1.8.0-openjdk-1.8.0.292-1.b10.ojdkbuild.windows.x86_64.zip"
+      $output = "openjdk8.zip"
       Invoke-WebRequest -Uri $url -OutFile $output
-      7z x $output -oC:\openjdk15
+      7z x $output -oC:\openjdk8
       Remove-Item $output
-      [Environment]::SetEnvironmentVariable("JAVA_HOME", "C:\openjdk15\jdk-15.0.1+9", "Machine")
+      [Environment]::SetEnvironmentVariable("JAVA_HOME", "C:\openjdk8\java-1.8.0-openjdk-1.8.0.292-1.b10.ojdkbuild.windows.x86_64", "Machine")
       refreshenv
       $env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
       echo $env:JAVA_HOME
       echo $env:PATH
       java -version
       javac -version
-
 build_script:
   - cmd: gradlew.bat build --info
 
@@ -25,4 +24,3 @@ test_script:
 cache:
   - '%USERPROFILE%\.gradle\caches'
   - '%USERPROFILE%\.gradle\wrapper'
-
