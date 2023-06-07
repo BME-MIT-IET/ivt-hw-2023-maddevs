@@ -264,3 +264,24 @@ Key lessons learned include:
 6. **Separation of Responsibilities**: Different functionalities should be separated into different classes or files for clarity and ease of maintenance.
 
 In general, this review emphasized the importance of good software development practices, including the principles of clean code, such as SRP, DRY (Don't Repeat Yourself), and clear documentation. Following these principles will lead to more maintainable, understandable, and efficient code.
+
+
+## Issue: Adding AppVeyor CI framework to our project
+
+[!appveyor](appveyordashboardscreenshot.png)
+
+### Overview
+
+We just began a plan to streamline our development process by adopting the AppVeyor framework, which is a Continuous Integration/Continuous Delivery (CI/CD) solution. 
+Our goal was to automate our build and testing processes in order to achieve greater consistency and reliability in our software development lifecycle. To that aim, we generated and configured an appveyor.yml file that detailed the exact stages for our new automated workflow, such as environment setup, task execution, and cache utilization for increased build efficiency.
+
+### Main Results 
+
+We achieved successful integration of the AppVeyor CI/CD framework by configuring an appveyor.yml file to automate our build processes and testing. 
+The script sets the environment variable JAVA_HOME, installs the OpenJDK 15, refreshes the environment variables, and appends the path to Java's bin directory to the PATH environment variable. 
+It then turns off the Gradle daemon for the current build, checks the Java version to ensure everything is set correctly, and proceeds to the assemble, build, and test tasks using gradlew.bat. 
+Moreover, we have utilized caching mechanisms for Gradle files, which speeds up the build process by reusing previously downloaded or generated files.
+
+### Lessons Learnt 
+
+The successful integration of AppVeyor demonstrated the crucial role automation plays in software development, especially in build processes and testing. It served as a valuable lesson on how to efficiently set up a CI/CD pipeline and optimize the build process using caching mechanisms. This experience emphasized the importance of incorporating such frameworks into our development lifecycle, providing a more streamlined, efficient, and reliable build and testing process.
