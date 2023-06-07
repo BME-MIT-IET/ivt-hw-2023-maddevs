@@ -15,8 +15,6 @@ install:
       $env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
       echo $env:JAVA_HOME
       echo $env:PATH
-      java -version
-      javac -version
 
 build_script:
   - cmd: gradlew.bat build --info
