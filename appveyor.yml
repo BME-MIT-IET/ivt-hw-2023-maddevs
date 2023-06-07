@@ -3,18 +3,21 @@ image: Visual Studio 2017
 
 install:
   - ps: |
-      $url = "https://github.com/ojdkbuild/ojdkbuild/releases/download/1.8.0.292-1/java-1.8.0-openjdk-1.8.0.292-1.b10.ojdkbuild.windows.x86_64.zip"
+      $url = "https://download.java.net/openjdk/jdk8u43/ri/openjdk-8u43-windows-i586.zip"
       $output = "openjdk8.zip"
+      Write-Host "Downloading OpenJDK..."
       Invoke-WebRequest -Uri $url -OutFile $output
-      7z x $output -oC:\openjdk8
+      Write-Host "Extracting OpenJDK..."
+      Expand-Archive -Path $output -DestinationPath C:\openjdk8
       Remove-Item $output
-      [Environment]::SetEnvironmentVariable("JAVA_HOME", "C:\openjdk8\java-1.8.0-openjdk-1.8.0.292-1.b10.ojdkbuild.windows.x86_64", "Machine")
+      [Environment]::SetEnvironmentVariable("JAVA_HOME", "C:\openjdk8", "Machine")
       refreshenv
       $env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
       echo $env:JAVA_HOME
       echo $env:PATH
       java -version
       javac -version
+
 build_script:
   - cmd: gradlew.bat build --info
 
